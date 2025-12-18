@@ -23,10 +23,9 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import os
 
-# 导入本地绘图风格配置
+# 导入本地绑图风格配置
 from plot_style import (
     apply_journal_style,
-    get_subplot_figsize,
     DOUBLE_COLUMN_WIDTH_INCH,
     PRINT_DPI,
     EFIELD_CMAP,
