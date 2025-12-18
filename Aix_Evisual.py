@@ -1,7 +1,18 @@
 import numpy as np
-# cmap='turbo',cividis，inferno，viridis / magma
+# cmap=''turbo,cividis，inferno，viridis / magma
+# -*- coding: utf-8 -*-
+"""
+Aix_Evisual.py - 单个电场分布文件的可视化 (重构版)
+
+功能:
+- 读取 Lumerical .mat 文件
+- 应用高斯滤波处理数据
+- 使用 plot_style 模块生成符合期刊单栏排版要求的图片
+"""
+
 import numpy as np
 import matplotlib as mpl
+
 mpl.use('Agg')  # 必须在导入 pyplot 之前设置后端
 import matplotlib.pyplot as plt
 import h5py
@@ -9,6 +20,12 @@ from scipy.ndimage import gaussian_filter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import traceback
 import os
+
+# ============================================================================
+#                           导入样式配置模块
+# ============================================================================
+from plot_style import create_single_column_figure, PRINT_DPI, E_CMAP
+
 
 class FieldVisualizer:
     """
@@ -24,37 +41,11 @@ class FieldVisualizer:
         """
         self.file_path = file_path
         self.group_name = group_name
-        self._setup_plot_style()
-
-    @staticmethod
-    def _setup_plot_style():
-        """配置 Matplotlib 的学术风格。"""
-        mpl.rcParams.update({
-            'font.family': 'sans-serif',
-            'font.size': 10,
-            'axes.labelsize': 11,
-            'axes.titlesize': 12,
-            'xtick.labelsize': 8,
-            'ytick.labelsize': 8,
-            'legend.fontsize': 9,
-            'figure.figsize': (3.35, 2.36),
-            'figure.dpi': 300,
-            'savefig.dpi': 600,
-            'xtick.major.width': 0.5,
-            'ytick.major.width': 0.5,
-            'xtick.direction': 'in',
-            'ytick.direction': 'in',
-            'axes.linewidth': 1.2
-        })
+        # 移除内部样式设置，改用 plot_style 模块在绘图时动态应用
 
     def process_field_data(self, target_lambda, target_z, sigma_val):
         """
         加载、处理和准备用于绘图的电场数据。
-
-        :param target_lambda: 目标波长 (单位: 米)。
-        :param target_z: 目标 Z 切片位置 (单位: 米)。
-        :param sigma_val: 高斯滤波的标准差。
-        :return: 一个包含绘图所需数据的字典。
         """
         print(f"正在处理文件: {self.file_path}...")
         with h5py.File(self.file_path, 'r') as f:
@@ -75,7 +66,7 @@ class FieldVisualizer:
             Ey = E_raw[1]['real'] + 1j * E_raw[1]['imag']
             Ez = E_raw[2]['real'] + 1j * E_raw[2]['imag']
 
-            E_total_complex = np.sqrt(Ex**2 + Ey**2 + Ez**2)
+            E_total_complex = np.sqrt(Ex ** 2 + Ey ** 2 + Ez ** 2)
             E_total_3D = E_total_complex.reshape((Nx, Ny, Nz), order='F')
 
             a_slice = np.abs(E_total_3D[:, :, idx_z])
@@ -84,6 +75,8 @@ class FieldVisualizer:
 
             plot_data = a_smooth.T
             extent = [x.min() * 1e6, x.max() * 1e6, y.min() * 1e6, y.max() * 1e6]
+
+            # 计算数据的物理高宽比 (Height / Width)
             aspect_ratio = (y.max() - y.min()) / (x.max() - x.min())
 
             return {
@@ -97,30 +90,47 @@ class FieldVisualizer:
     def plot_and_save(self, data, output_filename):
         """
         根据处理后的数据进行绘图并保存。
-
-        :param data: process_field_data 方法返回的字典。
-        :param output_filename: 输出图像的文件名。
+        使用 plot_style.create_single_column_figure 确保单栏宽度。
         """
-        fig, ax = plt.subplots(figsize=(8, 8 * data['aspect_ratio']))
+        # 1. 创建符合单栏宽度的 Figure (宽度固定为 3.5 英寸)
+        # aspect_ratio 参数确保画布高度适应数据形状
+        fig = create_single_column_figure(aspect_ratio=data['aspect_ratio'])
 
+        # 添加子图
+        ax = fig.add_subplot(111)
+
+        # 调节 colorbar 范围：例如固定 vmin=0, vmax=数据最大值的 80%
+        custom_vmin = 0  # 固定最小值
+        custom_vmax = 1  # 调整最大值为原值的 80%
+
+        # 2. 绘制图像
         im = ax.imshow(data['plot_data'],
                        extent=data['extent'],
-                       cmap='inferno',
+                       cmap=E_CMAP,
                        origin='lower',
                        aspect='equal',
-                       vmin=data['vmin'], vmax=data['vmax'],
+                       vmin=custom_vmin, vmax=custom_vmax,
                        interpolation='bilinear')
 
-        ax.set_xlabel('X (μm)', fontsize=10, fontname='Times New Roman')
-        ax.set_ylabel('Y (μm)', fontsize=10, fontname='Times New Roman')
+        # 3. 设置标签 (移除硬编码的字体和字号，使用 plot_style 的全局配置)
+        ax.set_xlabel('X (μm)')
+        ax.set_ylabel('Y (μm)')
+
+        # 设置刻度密度
         ax.xaxis.set_major_locator(plt.MaxNLocator(5))
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
 
+        # 4. 添加 Colorbar
+        # 使用 make_axes_locatable 可以在不改变主图宽高比太多的情况下附加 colorbar
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.1)
-        plt.colorbar(im, cax=cax)
+        cbar = plt.colorbar(im, cax=cax)
+        cbar.set_ticks(np.linspace(custom_vmin, custom_vmax, 5))
+        # cbar.set_label('Electric Field Intensity') # 可选
 
-        plt.savefig(output_filename)
+        # 5. 保存图片
+        # 使用 plot_style 定义的打印级 DPI
+        plt.savefig(output_filename, dpi=PRINT_DPI, bbox_inches='tight')
         plt.close(fig)
         print(f"图像已保存: {output_filename}")
 
@@ -132,10 +142,11 @@ def main():
     SIGMA_VAL = 1.5
     TARGET_LAMBDA = 1.55e-6
     TARGET_Z = 0.0
-
-    # 循环处理 E5.mat 到 E10.mat
-    for i in range(0, 5):
-        file_path = f'E{i}.mat'
+    DATA_DIR = 'E:\Postgraduate\Second\FDTD\VisualFunction\pro1_visual'
+    # 循环处理 E0.mat 到 E5.mat
+    for i in range(0, 6):
+        filename = f'E{i}.mat'
+        file_path = os.path.join(DATA_DIR, filename)
         output_filename = f'E{i}_plot.png'
 
         # 检查文件是否存在
@@ -166,4 +177,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
