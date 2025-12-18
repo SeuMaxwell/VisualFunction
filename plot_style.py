@@ -33,6 +33,9 @@ SCREEN_DPI = 150     # 屏幕预览
 PRINT_DPI = 300      # 打印质量
 PUBLICATION_DPI = 600  # 出版质量
 
+# Colorbar 相关设置
+COLORBAR_WIDTH_RATIO = 0.08  # Colorbar 占图像宽度的比例
+
 
 # ============================================================================
 #                           学术期刊风格配置
@@ -114,7 +117,7 @@ def apply_journal_style():
     -------
     >>> from plot_style import apply_journal_style
     >>> apply_journal_style()
-    >>> # 之后的所有绑图将使用期刊风格
+    >>> # 之后的所有绘图将使用期刊风格
     """
     mpl.rcParams.update(JOURNAL_STYLE)
 

@@ -29,7 +29,8 @@ from plot_style import (
     get_subplot_figsize,
     DOUBLE_COLUMN_WIDTH_INCH,
     PRINT_DPI,
-    EFIELD_CMAP
+    EFIELD_CMAP,
+    COLORBAR_WIDTH_RATIO
 )
 
 def load_and_process_data(filename, target_freq_idx=0):
@@ -105,13 +106,13 @@ def plot_comparison(data_buffer, output_filename, suptitle):
     - 所有子图共享同一colorbar
     """
     if not data_buffer:
-        print("数据缓冲区为空，无法绑图。")
+        print("数据缓冲区为空，无法绘图。")
         return
 
     num_plots = len(data_buffer)
     global_max_intensity = max([d['max_val'] for d in data_buffer if d['max_val'] > 0])
     if global_max_intensity == 0:
-        print("警告: 全局最大强度为0，无法进行归一化绑图。")
+        print("警告: 全局最大强度为0，无法进行归一化绘图。")
         return
 
     # 应用学术期刊风格
@@ -124,8 +125,7 @@ def plot_comparison(data_buffer, output_filename, suptitle):
     fig = plt.figure(figsize=(fig_width, fig_height), dpi=PRINT_DPI)
 
     # GridSpec布局：子图 + colorbar
-    # colorbar宽度比例设为0.08，相对更窄更专业
-    width_ratios = [1] * num_plots + [0.08]
+    width_ratios = [1] * num_plots + [COLORBAR_WIDTH_RATIO]
     gs = gridspec.GridSpec(1, num_plots + 1, width_ratios=width_ratios)
 
     pcm = None  # 保存最后一个pcolormesh对象用于colorbar
@@ -243,7 +243,7 @@ def run_visualization(config=None):
                 data_buffer.append(processed_data)
                 print(f"✓ 已加载: {os.path.basename(filename)}")
         
-        # 绑图
+        # 绘图
         if data_buffer:
             output_path = os.path.join(data_dir, state['output_filename'])
             plot_comparison(data_buffer, output_path, state['suptitle'])
